@@ -3,11 +3,64 @@ info:
   title: AI Travel Agent API
   version: 1.0.0
   description: API для работы с карточками событий и туров.
+servers:
+  - url: https://api.aitravel.com/v1
+    description: Production server
+
 paths:
- /events/{id}:
+  # ==================== PUBLIC ENDPOINTS ====================
+  
+  /events:
     get:
-      summary: Получить карточку события
-      description: Возвращает детальную информацию о событии, включая данные по отелю и полным циклом транспорта (туда-обратно).
+      summary: Получить список событий для главной страницы
+      description: Возвращает массив карточек туров с названием и кратким описанием
+      tags:
+        - Public
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+          description: Количество карточек для возврата
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Смещение для пагинации
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по городу
+      responses:
+        '200':
+          description: Успешный ответ с массивом карточек
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventCard'
+                  total:
+                    type: integer
+        '400':
+          description: Неверные параметры запроса
+
+  /events/{id}:
+    get:
+      summary: Получить детальную информацию о событии
+      description: Возвращает полную информацию о туре, включая отель и транспорт
+      tags:
+        - Public
       parameters:
         - name: id
           in: path
@@ -25,15 +78,134 @@ paths:
         '404':
           description: Событие не найдено
 
+  # ==================== ADMIN ENDPOINTS ====================
+  
+  /admin/tours:
+    post:
+      summary: Создать новый тур
+      description: Эндпоинт для администратора для создания нового тура
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTourRequest'
+      responses:
+        '201':
+          description: Тур успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TourEvent'
+        '400':
+          description: Ошибка валидации данных
+        '401':
+          description: Неавторизованный запрос
+        '403':
+          description: Недостаточно прав доступа
+
+  /admin/tours/{id}:
+    put:
+      summary: Обновить существующий тур
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTourRequest'
+      responses:
+        '200':
+          description: Тур успешно обновлён
+        '404':
+          description: Тур не найден
+
+    delete:
+      summary: Удалить тур
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Тур успешно удалён
+        '404':
+          description: Тур не найден
+
+  /admin/tours/{id}/generate-description:
+    post:
+      summary: Сгенерировать описание тура через AI
+      description: Использует нейросеть для генерации подробного описания плана отдыха
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:
+                  type: string
+                  default: "ru"
+      responses:
+        '200':
+          description: Описание успешно сгенерировано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: string
+                    description: Сгенерированное описание плана отдыха
+        '404':
+          description: Тур не найден
+        '500':
+          description: Ошибка AI сервиса
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
-    TourEvent:
+    # Минимальная карточка для списка
+    EventCard:
       type: object
       required:
         - id
         - title
-        - city
-        - image_url
+        - description
       properties:
         id:
           type: string
@@ -45,67 +217,76 @@ components:
           example: "Экскурсия по Колизею"
         description:
           type: string
-          description: Подробное описание
+          description: Краткое описание плана отдыха
+          example: "5 дней в Риме с посещением Колизея, Ватикана и исторического центра"
+
+    # Полная карточка события
+    TourEvent:
+      type: object
+      required:
+        - id
+        - title
+        - city
+        - image_url
+      properties:
+        id:
+          type: string
+          example: "evt_9942a"
+        title:
+          type: string
+          example: "Экскурсия по Колизею"
+        description:
+          type: string
           example: "Погружение в историю Древнего Рима..."
         city:
           type: string
-          description: Город проведения события или проживания
           example: "Рим"
+        country:
+          type: string
+          example: "Италия"
         departure_time:
           type: string
           format: date-time
-          description: Дата и время вылета/отправления (Туда)
           example: "2026-05-10T08:00:00Z"
         arrival_time:
           type: string
           format: date-time
-          description: Дата и время прилета/прибытия (Туда)
           example: "2026-05-10T11:30:00Z"
         transport_type:
           type: string
-          description: Тип транспорта
           enum: [поезд, самолет, вертолет, автобус]
           example: "самолет"
         hotel_name:
           type: string
-          description: Название отеля
           example: "Radisson Blu GHR"
         hotel_stars:
           type: integer
-          description: Количество звезд у отеля
           example: 4
         hotel_address:
           type: string
-          description: Адрес отеля
           example: "Via Luigi Luciani 41, Рим"
         hotel_check_in_time:
           type: string
           format: date-time
-          description: Время и дата заселения в отель
           example: "2026-05-10T14:00:00Z"
         hotel_check_out_time:
           type: string
           format: date-time
-          description: Время и дата выселения из отеля
           example: "2026-05-15T12:00:00Z"
         return_departure_time:
           type: string
           format: date-time
-          description: Дата и время вылета/отправления (Обратно)
           example: "2026-05-15T16:00:00Z"
         return_arrival_time:
           type: string
           format: date-time
-          description: Дата и время прилета/прибытия (Обратно)
           example: "2026-05-15T19:30:00Z"
         image_url:
           type: string
           format: uri
-          description: Прямая ссылка на изображение
           example: "https://your-s3-bucket.s3.amazonaws.com/hotels/radisson_rome.jpg"
         included_in_tour:
           type: object
-          description: Описание того, что включено в стоимость
           properties:
             flight:
               type: boolean
@@ -124,3 +305,170 @@ components:
             insurance:
               type: boolean
               example: false
+        events:
+          type: string
+          description: Подробное описание плана отдыха (генерируется нейросетью)
+          example: |
+            📅 День 1: Вылет в 08:00, прилёт в 11:30. Заселение в отель с 14:00.
+            📅 День 2: Экскурсия по Колизею и Римскому форуму.
+            📅 День 3: Посещение Ватикана.
+            📅 День 4: Свободный день.
+            📅 День 5: Выселение, вылет в 16:00.
+        price:
+          type: number
+          format: float
+          example: 89900
+        currency:
+          type: string
+          default: "RUB"
+        rating:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 5
+          example: 4.7
+        reviews_count:
+          type: integer
+          example: 128
+
+    # Запрос на создание тура (админ)
+    CreateTourRequest:
+      type: object
+      required:
+        - title
+        - city
+        - departure_time
+        - arrival_time
+        - hotel_check_in_time
+        - hotel_check_out_time
+        - return_departure_time
+        - return_arrival_time
+        - hotel_name
+        - transport_type
+        - price
+      properties:
+        title:
+          type: string
+          example: "Романтические выходные в Риме"
+        city:
+          type: string
+          example: "Рим"
+        country:
+          type: string
+          example: "Италия"
+        description:
+          type: string
+        # Транспорт туда
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        # Отель
+        hotel_name:
+          type: string
+        hotel_stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+        hotel_address:
+          type: string
+        hotel_check_in_time:
+          type: string
+          format: date-time
+        hotel_check_out_time:
+          type: string
+          format: date-time
+        # Транспорт обратно
+        return_departure_time:
+          type: string
+          format: date-time
+        return_arrival_time:
+          type: string
+          format: date-time
+        # Общие параметры
+        transport_type:
+          type: string
+          enum: [поезд, самолет, вертолет, автобус]
+        price:
+          type: number
+          format: float
+        currency:
+          type: string
+          default: "RUB"
+        image_url:
+          type: string
+          format: uri
+        included_in_tour:
+          type: object
+          properties:
+            flight:
+              type: boolean
+              default: true
+            transfer:
+              type: boolean
+              default: true
+            meals:
+              type: array
+              items:
+                type: string
+            guide_services:
+              type: boolean
+              default: false
+            insurance:
+              type: boolean
+              default: false
+        generate_ai_description:
+          type: boolean
+          default: true
+
+    UpdateTourRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        description:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        hotel_name:
+          type: string
+        hotel_stars:
+          type: integer
+        hotel_address:
+          type: string
+        hotel_check_in_time:
+          type: string
+          format: date-time
+        hotel_check_out_time:
+          type: string
+          format: date-time
+        return_departure_time:
+          type: string
+          format: date-time
+        return_arrival_time:
+          type: string
+          format: date-time
+        transport_type:
+          type: string
+          enum: [поезд, самолет, вертолет, автобус]
+        price:
+          type: number
+        currency:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        included_in_tour:
+          type: object
+        events:
+          type: string
