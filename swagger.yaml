@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: AI Travel Agent API
+  version: 1.0.0
+  description: API для работы с карточками событий и туров.
+paths:
+  /api/v1/events/{id}:
+    get:
+      summary: Получить карточку события
+      description: Возвращает детальную информацию о событии, включая данные по отелю и полным циклом транспорта (туда-обратно).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: evt_9942a
+      responses:
+        '200':
+          description: Успешный ответ с данными события
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TourEvent'
+        '404':
+          description: Событие не найдено
+
+components:
+  schemas:
+    TourEvent:
+      type: object
+      required:
+        - id
+        - title
+        - city
+        - image_url
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор события
+          example: "evt_9942a"
+        title:
+          type: string
+          description: Название события
+          example: "Экскурсия по Колизею"
+        description:
+          type: string
+          description: Подробное описание
+          example: "Погружение в историю Древнего Рима..."
+        city:
+          type: string
+          description: Город проведения события или проживания
+          example: "Рим"
+        departure_time:
+          type: string
+          format: date-time
+          description: Дата и время вылета/отправления (Туда)
+          example: "2026-05-10T08:00:00Z"
+        arrival_time:
+          type: string
+          format: date-time
+          description: Дата и время прилета/прибытия (Туда)
+          example: "2026-05-10T11:30:00Z"
+        transport_type:
+          type: string
+          description: Тип транспорта
+          enum: [поезд, самолет, вертолет, автобус]
+          example: "самолет"
+        hotel_name:
+          type: string
+          description: Название отеля
+          example: "Radisson Blu GHR"
+        hotel_stars:
+          type: integer
+          description: Количество звезд у отеля
+          example: 4
+        hotel_address:
+          type: string
+          description: Адрес отеля
+          example: "Via Luigi Luciani 41, Рим"
+        hotel_check_in_time:
+          type: string
+          format: date-time
+          description: Время и дата заселения в отель
+          example: "2026-05-10T14:00:00Z"
+        hotel_check_out_time:
+          type: string
+          format: date-time
+          description: Время и дата выселения из отеля
+          example: "2026-05-15T12:00:00Z"
+        return_departure_time:
+          type: string
+          format: date-time
+          description: Дата и время вылета/отправления (Обратно)
+          example: "2026-05-15T16:00:00Z"
+        return_arrival_time:
+          type: string
+          format: date-time
+          description: Дата и время прилета/прибытия (Обратно)
+          example: "2026-05-15T19:30:00Z"
+        image_url:
+          type: string
+          format: uri
+          description: Прямая ссылка на изображение
+          example: "https://your-s3-bucket.s3.amazonaws.com/hotels/radisson_rome.jpg"
+        included_in_tour:
+          type: object
+          description: Описание того, что включено в стоимость
+          properties:
+            flight:
+              type: boolean
+              example: true
+            transfer:
+              type: boolean
+              example: true
+            meals:
+              type: array
+              items:
+                type: string
+              example: ["завтрак", "ужин"]
+            guide_services:
+              type: boolean
+              example: true
+            insurance:
+              type: boolean
+              example: false
