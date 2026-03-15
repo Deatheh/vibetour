@@ -21,7 +21,7 @@ type TourService interface {
 	GetTourByID(ctx context.Context, id string) (domains.Tour, error)
 	CreateTour(ctx context.Context, t domains.Tour) (domains.Tour, error)
 	DeleteTour(ctx context.Context, id string) error
-	GenerateAIDescription(ctx context.Context, id string) ([]byte, error)
+	GenerateAIDescription(ctx context.Context, id string) ([]string, error)
 }
 
 type EventCardDTO struct {
@@ -198,14 +198,14 @@ func (h *TourHandler) DeleteTour(c *gin.Context) {
 
 func (h *TourHandler) GenerateDescription(c *gin.Context) {
 	id := c.Param("id")
-	eventsJSON, err := h.service.GenerateAIDescription(c.Request.Context(), id)
+	events, err := h.service.GenerateAIDescription(c.Request.Context(), id)
 	if err != nil {
 		h.handleError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"events": eventsJSON,
+		"events": events,
 	})
 }
 
