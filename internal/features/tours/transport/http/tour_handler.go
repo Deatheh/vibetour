@@ -21,7 +21,7 @@ type TourService interface {
 	GetTourByID(ctx context.Context, id string) (domains.Tour, error)
 	CreateTour(ctx context.Context, t domains.Tour) (domains.Tour, error)
 	DeleteTour(ctx context.Context, id string) error
-	GenerateAIDescription(ctx context.Context, id string) (string, error)
+	GenerateAIDescription(ctx context.Context, id string) ([]byte, error)
 }
 
 type EventCardDTO struct {
