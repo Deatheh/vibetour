@@ -51,12 +51,51 @@ func (s *TourService) DeleteTour(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *TourService) GenerateAIDescription(ctx context.Context, id string) ([]byte, error) {
+type Event struct {
+	EventDate   string `json:"event_date"`
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+	Description string `json:"description"`
+}
+
+// convertToFormattedStrings преобразует JSON строку в массив форматированных строк
+func convertToFormattedStrings(jsonStr string) ([]string, error) {
+	// Очищаем строку от маркеров кода
+	cleanStr := strings.TrimSpace(jsonStr)
+	cleanStr = strings.TrimPrefix(cleanStr, "```json")
+	cleanStr = strings.TrimPrefix(cleanStr, "```")
+	cleanStr = strings.TrimSuffix(cleanStr, "```")
+	cleanStr = strings.TrimSpace(cleanStr)
+
+	// Парсим JSON в массив событий
+	var events []Event
+	err := json.Unmarshal([]byte(cleanStr), &events)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка парсинга JSON: %w", err)
+	}
+
+	// Создаем массив форматированных строк
+	formattedStrings := make([]string, 0, len(events))
+
+	for _, event := range events {
+		// Формат: дата время начала-время конца: описание
+		formatted := fmt.Sprintf("%s %s-%s: %s",
+			event.EventDate,
+			event.StartTime,
+			event.EndTime,
+			event.Description)
+
+		formattedStrings = append(formattedStrings, formatted)
+	}
+
+	return formattedStrings, nil
+}
+
+func (s *TourService) GenerateAIDescription(ctx context.Context, id string) ([]string, error) {
 	tour, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-
 	cfg := openai.DefaultConfig(os.Getenv("ZVENOAI_API_KEY"))
 	cfg.BaseURL = "https://api.zveno.ai/v1"
 
@@ -65,7 +104,7 @@ func (s *TourService) GenerateAIDescription(ctx context.Context, id string) ([]b
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: "qwen/qwen3-next-80b-a3b-instruct:free",
+			Model: "qwen/qwen3-max-thinking",
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role: openai.ChatMessageRoleUser,
@@ -96,10 +135,10 @@ func (s *TourService) GenerateAIDescription(ctx context.Context, id string) ([]b
 	}
 	fmt.Println(resp.Choices[0].Message.Content)
 
-	eventsJSON, err := json.MarshalIndent(resp.Choices[0].Message.Content, "", "  ")
+	result, err := convertToFormattedStrings(resp.Choices[0].Message.Content)
 	if err != nil {
 		return nil, err
 	}
 
-	return eventsJSON, nil
+	return result, nil
 }
