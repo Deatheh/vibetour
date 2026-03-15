@@ -1,3 +1,6 @@
+DB_USER ?= usr
+DB_PASSWORD ?= pwd
+DB_NAME ?= vibetour
 DB_URL:=postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable
 
 .PHONY: all build run test lint up down clean migrate-up migrate-down
