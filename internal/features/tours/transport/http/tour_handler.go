@@ -12,6 +12,8 @@ import (
 	"vibetour/internal/core/domains"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,6 +66,11 @@ func NewTourHandler(service TourService, log *zap.Logger) *TourHandler {
 }
 
 func (h *TourHandler) RegisterRoutes(r *gin.Engine) {
+	r.StaticFile("/docs/swagger.yaml", "./docs/swagger.yaml")
+
+	url := ginSwagger.URL("/docs/swagger.yaml")
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+
 	r.GET("/events", h.GetEvents)
 	r.GET("/events/:id", h.GetEventDetails)
 

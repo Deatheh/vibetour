@@ -21,7 +21,6 @@ func NewConfig() *Config {
 
 	err := cleanenv.ReadConfig(".env", &cfg)
 	if err != nil {
-		// Если файла .env нет, читаем только системные переменные окружения
 		err = cleanenv.ReadEnv(&cfg)
 		if err != nil {
 			log.Fatalf("Error reading env config: %s", err)
