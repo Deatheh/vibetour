@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS included_items;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS tours;

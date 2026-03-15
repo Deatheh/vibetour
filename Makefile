@@ -1,29 +1,29 @@
-# Удобный Makefile для запуска и сборки проекта
+DB_URL:=postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable
 
-.PHONY: all build run test lint up down clean
+.PHONY: all build run test lint up down clean migrate-up migrate-down
 
 all: build
 
-# Запуск приложения локально
 run:
 	go run ./cmd/api/main.go
 
-# Сборка бинарника
 build:
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/api ./cmd/api/main.go
 
-# Запуск тестов
 test:
 	go test -v -race ./...
 
-# Запуск инфраструктуры (БД, S3, API) через Docker Compose
 up:
 	docker-compose up -d --build
 
-# Остановка инфраструктуры Docker
 down:
 	docker-compose down
 
-# Быстрая очистка сгенерированных файлов
 clean:
 	rm -rf bin/
+
+migrate-up:
+	migrate -path migrations -database $(DB_URL) up
+
+migrate-down:
+	migrate -path migrations -database $(DB_URL) down
