@@ -11,9 +11,12 @@ import (
 
 	"vibetour/internal/core/config"
 	"vibetour/internal/core/logger"
-	"vibetour/internal/features/tours/repository"
-	"vibetour/internal/features/tours/service"
-	httptransport "vibetour/internal/features/tours/transport/http"
+	auth_repo "vibetour/internal/features/auth/repository"
+	auth_service "vibetour/internal/features/auth/service"
+	auth_http "vibetour/internal/features/auth/transport/http"
+	tour_repo "vibetour/internal/features/tours/repository"
+	tour_service "vibetour/internal/features/tours/service"
+	tour_http "vibetour/internal/features/tours/transport/http"
 )
 
 func main() {
@@ -33,7 +36,7 @@ func main() {
 	mainCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := repository.NewPostgresConnection(mainCtx, cfg)
+	pool, err := tour_repo.NewPostgresConnection(mainCtx, cfg)
 	if err != nil {
 		log.Fatal("Unable to connect to database", zap.Error(err))
 	}
@@ -41,11 +44,17 @@ func main() {
 		pool.Close()
 	}()
 
-	tourRepo := repository.NewTourPostgres(pool, log)
-	tourService := service.NewTourService(tourRepo)
-	tourHandler := httptransport.NewTourHandler(tourService, log)
+	authRepo := auth_repo.NewAuthRepository(pool, log)
+	authSvc := auth_service.NewAuthService(authRepo, cfg, log)
+	authHandler := auth_http.NewAuthHandler(authSvc, cfg)
+
+	tourRepo := tour_repo.NewTourPostgres(pool, log)
+	tourService := tour_service.NewTourService(tourRepo)
+	tourHandler := tour_http.NewTourHandler(tourService, log, cfg)
 
 	router := gin.Default()
+
+	authHandler.RegisterRoutes(router)
 	tourHandler.RegisterRoutes(router)
 
 	if err := tourHandler.RunServer(mainCtx, router); err != nil {

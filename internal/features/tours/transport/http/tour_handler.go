@@ -12,8 +12,13 @@ import (
 	"vibetour/internal/core/domains"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+
+	"vibetour/internal/core/config"
+	http_auth "vibetour/internal/features/auth/transport/http"
 )
 
 type TourService interface {
@@ -54,20 +59,28 @@ type CreateTourRequestDTO struct {
 type TourHandler struct {
 	service TourService
 	log     *zap.Logger
+	cfg     *config.Config
 }
 
-func NewTourHandler(service TourService, log *zap.Logger) *TourHandler {
+func NewTourHandler(service TourService, log *zap.Logger, cfg *config.Config) *TourHandler {
 	return &TourHandler{
 		service: service,
 		log:     log,
+		cfg:     cfg,
 	}
 }
 
 func (h *TourHandler) RegisterRoutes(r *gin.Engine) {
+	r.StaticFile("/docs/swagger.yaml", "./docs/swagger.yaml")
+
+	url := ginSwagger.URL("/docs/swagger.yaml")
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+
 	r.GET("/events", h.GetEvents)
 	r.GET("/events/:id", h.GetEventDetails)
 
 	admin := r.Group("/admin")
+	admin.Use(http_auth.AuthMiddleware(h.cfg))
 	{
 		admin.POST("/tours", h.CreateTour)
 		admin.DELETE("/tours/:id", h.DeleteTour)
