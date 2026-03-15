@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"vibetour/internal/core/domains"
+
+	openai "github.com/sashabaranov/go-openai"
 )
 
 type TourRepository interface {
@@ -48,32 +51,55 @@ func (s *TourService) DeleteTour(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *TourService) GenerateAIDescription(ctx context.Context, id string) (string, error) {
+func (s *TourService) GenerateAIDescription(ctx context.Context, id string) ([]byte, error) {
 	tour, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	aiEvents := []domains.AIEvent{
-		{
-			Title:       fmt.Sprintf("Специальное событие в %s", tour.City),
-			Description: "Уникальная выставка/экскурсия с дешевыми билетами.",
-			Date:        tour.ArrivalTime.AddDate(0, 0, 1).Format("2006-01-02"),
-		},
-		{
-			Title:       "Концерт/Театр для вечернего отдыха",
-			Description: "Доступные билеты на вечернее шоу в центре города.",
-			Date:        tour.ArrivalTime.AddDate(0, 0, 2).Format("2006-01-02"),
-		},
-	}
+	cfg := openai.DefaultConfig(os.Getenv("ZVENOAI_API_KEY"))
+	cfg.BaseURL = "https://api.zveno.ai/v1"
 
-	eventsJSON, _ := json.MarshalIndent(aiEvents, "", "  ")
-	eventsStr := string(eventsJSON)
+	client := openai.NewClientWithConfig(cfg)
 
-	err = s.repo.UpdateEvents(ctx, id, eventsStr)
+	resp, err := client.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: "qwen/qwen3-next-80b-a3b-instruct:free",
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role: openai.ChatMessageRoleUser,
+					Content: fmt.Sprintf(`Напиши события, которые проходят в городе: %s с %s по %s. Ответ должен быть в виде JSON объекта, состоящего из массива объектов с полями: 
+					event_date
+					start_time
+					end_time
+					description (на русском)
+					(Название полей должны быть на английском языке).
+					Пример:
+					{
+						"event_date": "2026-03-16",
+						"start_time": "12:00",
+						"end_time": "18:00",
+						"description": "Фестиваль весенней книги на ВДНХ — встречи с авторами, презентации новых изданий и мастер-классы для читателей всех возрастов."
+					}
+					`, tour.City, tour.ArrivalTime.String(), tour.ReturnDepartureTime.String()),
+				},
+			},
+		},
+	)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return eventsStr, nil
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("Пустой ответ")
+	}
+	fmt.Println(resp.Choices[0].Message.Content)
+
+	eventsJSON, err := json.MarshalIndent(resp.Choices[0].Message.Content, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	return eventsJSON, nil
 }
